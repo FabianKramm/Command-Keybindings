@@ -25,6 +25,7 @@ public class KeyHandler {
     private KeyBinding[] keys;
     byte[] keyTimer;
     private boolean isLoaded;
+
     public KeyHandler(){
         keys = new KeyBinding[ConfigValues.COMMANDS.length];
         keyTimer = new byte[keys.length];
@@ -39,16 +40,20 @@ public class KeyHandler {
             keys[i].setKeyModifierAndCode(KeyModifier.values()[MODIFIERS[i]], BINDINGSTORAGE[i]);
             ClientRegistry.registerKeyBinding(keys[i]);
         }
+
         isLoaded = true;
     }
+
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event){
         for(int i=0;i<ConfigValues.COMMANDS.length;++i){
             if(i < keys.length && i < keyTimer.length) {
-                if(keyTimer[i] <= 0)
-                    if (keys[i].isPressed() && (KeyModifier.values()[MODIFIERS[i]].equals(KeyModifier.NONE) || KeyModifier.values()[MODIFIERS[i]].isActive(KeyConflictContext.IN_GAME)))
+                if(keyTimer[i] <= 0) {
+                    if (keys[i].isPressed()) {
                         command(ConfigValues.COMMANDS[i]);
+                    }
+                }
             }
         }
     }
