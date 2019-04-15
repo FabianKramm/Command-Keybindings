@@ -2,4 +2,4 @@ commlist=Commands
 commlist.tooltip=List of commands. Generates a keybind for each one.
 comm.tooltip=Don't include the / in front of the command.
 key.commbind.category=Command Keybinds
-key.comm=Command Key: /%s
+key.comm=/%s

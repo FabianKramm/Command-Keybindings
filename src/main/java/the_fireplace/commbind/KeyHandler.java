@@ -4,7 +4,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.client.settings.KeyConflictContext;
-import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
@@ -14,92 +13,82 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.lwjgl.input.Keyboard;
 import the_fireplace.commbind.config.ConfigValues;
 
-import static the_fireplace.commbind.config.ConfigValues.BINDINGSTORAGE;
-import static the_fireplace.commbind.config.ConfigValues.MODIFIERS;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author The_Fireplace
  */
 public class KeyHandler {
     private static final String desc = "key.comm";
-    private KeyBinding[] keys;
-    byte[] keyTimer;
-    private boolean isLoaded;
+    private List<KeyCommandBinding> keys;
 
     public KeyHandler(){
-        keys = new KeyBinding[ConfigValues.COMMANDS.length];
-        keyTimer = new byte[keys.length];
-        for(int i = 0; i < ConfigValues.COMMANDS.length; ++i){
-            while(BINDINGSTORAGE.length<ConfigValues.COMMANDS.length){
-                BINDINGSTORAGE = ArrayUtils.add(BINDINGSTORAGE, Keyboard.KEY_NONE);
-            }
-            while(MODIFIERS.length<ConfigValues.COMMANDS.length){
-                MODIFIERS = ArrayUtils.add(MODIFIERS, KeyModifier.NONE.ordinal());
-            }
-            keys[i] = new KeyBinding(I18n.format(desc, ConfigValues.COMMANDS[i]), BINDINGSTORAGE[i], "key.commbind.category");
-            keys[i].setKeyModifierAndCode(KeyModifier.values()[MODIFIERS[i]], BINDINGSTORAGE[i]);
-            ClientRegistry.registerKeyBinding(keys[i]);
-        }
+        keys = new ArrayList<>();
 
-        isLoaded = true;
+        for (int i = 0; i < ConfigValues.COMMANDS.length; i++) {
+            String command = ConfigValues.COMMANDS[i];
+            KeyBinding keyBinding = new KeyBinding(I18n.format(desc, command), KeyConflictContext.IN_GAME, Keyboard.KEY_NONE, "key.commbind.category");
+
+            keys.add(new KeyCommandBinding(keyBinding, command));
+            ClientRegistry.registerKeyBinding(keyBinding);
+        }
     }
 
     @SideOnly(Side.CLIENT)
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event){
-        for(int i=0;i<ConfigValues.COMMANDS.length;++i){
-            if(i < keys.length && i < keyTimer.length) {
-                if(keyTimer[i] <= 0) {
-                    if (keys[i].isPressed()) {
-                        command(ConfigValues.COMMANDS[i]);
-                    }
-                }
+        for(KeyCommandBinding keyCommandBinding: keys) {
+            if (keyCommandBinding.keyBinding.isPressed()) {
+                command(keyCommandBinding.command);
             }
         }
     }
 
     public void command(String command){
         if(Minecraft.getMinecraft().inGameHasFocus) {
+            System.out.println("Send chat message");
+
             Minecraft.getMinecraft().player.sendChatMessage("/" + command);
-            this.keyTimer[ArrayUtils.indexOf(ConfigValues.COMMANDS, command)] = 20;
         }
     }
 
-    public void saveBindings(){
-        int[] updatedBindings = CommBind.BINDINGS.getIntList();
-        int[] updatedModifiers = CommBind.MODIFIERS.getIntList();
-        //Create lists of bindings and modifiers set to none
-        while(updatedBindings.length<keys.length)
-            updatedBindings = ArrayUtils.add(updatedBindings, Keyboard.KEY_NONE);
-        while(updatedModifiers.length<keys.length)
-            updatedModifiers = ArrayUtils.add(updatedModifiers, KeyModifier.NONE.ordinal());
-        //Update all the bindings and modifiers
-        for(int i=0;i<keys.length;++i){
-            updatedBindings[i]=keys[i].getKeyCode();
-            updatedModifiers[i]=keys[i].getKeyModifier().ordinal();
+    public void updateKeyBindings() {
+        // Delete key bindings that are not there anymore
+        for (int i = 0; i < keys.size(); i++) {
+            KeyCommandBinding keyCommandBinding = keys.get(i);
+            boolean found = false;
+
+            for (String command : ConfigValues.COMMANDS) {
+                if (command.equals(keyCommandBinding.command)) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                Minecraft.getMinecraft().gameSettings.keyBindings = ArrayUtils.remove(Minecraft.getMinecraft().gameSettings.keyBindings, ArrayUtils.indexOf(Minecraft.getMinecraft().gameSettings.keyBindings, keyCommandBinding.keyBinding));
+                keys.remove(i);
+                i--;
+            }
         }
-        CommBind.BINDINGS.set(updatedBindings);
-        CommBind.MODIFIERS.set(updatedModifiers);
-        CommBind.syncConfig();
-    }
 
-    public void reload(){
-        if(isLoaded) {
-            for (KeyBinding key : keys)
-                Minecraft.getMinecraft().gameSettings.keyBindings = ArrayUtils.remove(Minecraft.getMinecraft().gameSettings.keyBindings, ArrayUtils.indexOf(Minecraft.getMinecraft().gameSettings.keyBindings, key));
+        // Add key bindings that are not there yet
+        for (String command : ConfigValues.COMMANDS) {
+            boolean found = false;
 
-            keys = new KeyBinding[ConfigValues.COMMANDS.length];
-            keyTimer = new byte[keys.length];
-            for (int i = 0; i < ConfigValues.COMMANDS.length; ++i) {
-                while (BINDINGSTORAGE.length < ConfigValues.COMMANDS.length) {
-                    BINDINGSTORAGE = ArrayUtils.add(BINDINGSTORAGE, Keyboard.KEY_NONE);
+            for (KeyCommandBinding keyCommandBinding : keys) {
+                if (command.equals(keyCommandBinding.command)) {
+                    found = true;
+                    break;
                 }
-                while (MODIFIERS.length < ConfigValues.COMMANDS.length) {
-                    MODIFIERS = ArrayUtils.add(MODIFIERS, KeyModifier.NONE.ordinal());
-                }
-                keys[i] = new KeyBinding(I18n.format(desc, ConfigValues.COMMANDS[i]), BINDINGSTORAGE[i], "key.commbind.category");
-                keys[i].setKeyModifierAndCode(KeyModifier.values()[MODIFIERS[i]], BINDINGSTORAGE[i]);
-                ClientRegistry.registerKeyBinding(keys[i]);
+            }
+
+            if (!found) {
+                KeyBinding keyBinding = new KeyBinding(I18n.format(desc, command), KeyConflictContext.IN_GAME, Keyboard.KEY_NONE, "key.commbind.category");
+
+                keys.add(new KeyCommandBinding(keyBinding, command));
+                ClientRegistry.registerKeyBinding(keyBinding);
             }
         }
     }
