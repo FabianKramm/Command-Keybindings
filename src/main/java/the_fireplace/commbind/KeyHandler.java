@@ -47,8 +47,6 @@ public class KeyHandler {
 
     public void command(String command){
         if(Minecraft.getMinecraft().inGameHasFocus) {
-            System.out.println("Send chat message");
-
             Minecraft.getMinecraft().player.sendChatMessage("/" + command);
         }
     }
